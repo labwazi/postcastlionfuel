@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LionFuel Podcast – Professional Live Streaming</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <style>
         :root {
             --primary: #FF6B00;
@@ -360,6 +361,19 @@
             animation: pulse 1.5s infinite;
         }
         
+        /* Connection ID Display */
+        .connection-id {
+            background: rgba(255, 107, 0, 0.1);
+            border: 1px solid rgba(255, 107, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+            text-align: center;
+            font-family: monospace;
+            font-size: 16px;
+            word-break: break-all;
+        }
+        
         /* Footer */
         footer {
             margin-top: 40px;
@@ -405,6 +419,23 @@
         
         .recording-timer.active {
             display: flex;
+        }
+        
+        /* Viewer List */
+        .viewer-list {
+            list-style: none;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .viewer-item {
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 6px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
         
         /* Responsive Adjustments */
@@ -485,6 +516,11 @@
                                 <i class="fas fa-copy"></i> Copy
                             </button>
                         </div>
+                        
+                        <div id="connectionIdDisplay" class="connection-id" style="display: none;">
+                            Your Connection ID: <span id="connectionId"></span>
+                        </div>
+                        
                         <div class="status-indicators">
                             <div class="status-item">
                                 <div class="status-label">
@@ -508,6 +544,11 @@
                                 <span id="viewersCount">0</span>
                             </div>
                         </div>
+                        
+                        <div id="viewersContainer" style="display: none;">
+                            <h4 style="margin-top: 15px; margin-bottom: 10px;">Connected Viewers:</h4>
+                            <ul class="viewer-list" id="viewerList"></ul>
+                        </div>
                     </div>
                 </div>
                 
@@ -524,11 +565,11 @@
                 <div class="panel">
                     <h3 class="panel-title"><i class="fas fa-info-circle"></i> How to Use</h3>
                     <ol style="padding-left: 20px; display: flex; flex-direction: column; gap: 10px;">
-                        <li>Click "Go Live (Host)" to start your stream</li>
-                        <li>Share the generated link with your audience</li>
-                        <li>Use "Start Recording" to record your podcast</li>
-                        <li>Stop recording when finished - file will download automatically</li>
-                        <li>Use WhatsApp button to schedule 1-on-1 consultations</li>
+                        <li><strong>As Host:</strong> Click "Go Live (Host)" to start your stream</li>
+                        <li><strong>Share:</strong> Copy the generated link and send to viewers</li>
+                        <li><strong>As Viewer:</strong> Open the link in any browser to watch</li>
+                        <li><strong>Record:</strong> Use "Start Recording" to save your podcast</li>
+                        <li><strong>Chat:</strong> Use WhatsApp button for 1-on-1 consultations</li>
                     </ol>
                 </div>
             </div>
@@ -536,7 +577,7 @@
         
         <footer>
             <p>© 2023 LionFuel Podcast Network. All rights reserved. | Professional Live Streaming Platform</p>
-            <p style="margin-top: 5px; font-size: 12px;">No backend required - 100% front-end streaming solution</p>
+            <p style="margin-top: 5px; font-size: 12px;">Powered by PeerJS for real-time streaming</p>
         </footer>
     </div>
     
@@ -562,166 +603,313 @@
         const goLiveBtn = document.getElementById('goLiveBtn');
         const recordingTimer = document.getElementById('recordingTimer');
         const timerDisplay = document.getElementById('timerDisplay');
+        const connectionIdDisplay = document.getElementById('connectionIdDisplay');
+        const connectionIdSpan = document.getElementById('connectionId');
+        const viewersContainer = document.getElementById('viewersContainer');
+        const viewerList = document.getElementById('viewerList');
         
         // Global Variables
-        let peerConnection;
+        let peer;
         let localStream;
         let mediaRecorder;
         let recordedChunks = [];
         let recordingStartTime;
         let timerInterval;
-        let viewerCount = 0;
+        let activeConnections = [];
+        let viewerConnections = new Map(); // Track viewer connections
+        let isHost = false;
+        let myPeerId = null;
         
         // Initialize page
         document.addEventListener('DOMContentLoaded', function() {
-            // Check if we should join as a viewer
+            // Check if we should join as a viewer (if there's a hash in URL)
             if (window.location.hash && window.location.hash.length > 1) {
                 joinAsViewer();
             }
-            
-            // Simulate viewer count updates (in a real app, this would come from a signaling server)
-            setInterval(() => {
-                if (peerConnection && localStream) {
-                    viewerCount += Math.floor(Math.random() * 3);
-                    viewersCount.textContent = viewerCount;
-                }
-            }, 5000);
         });
         
         // Host: Start Live Stream
         async function goLive() {
             try {
-                // Get user media
+                // Get user media (camera and microphone)
                 localStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 1280, height: 720 },
-                    audio: true
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: "user"
+                    },
+                    audio: {
+                        echoCancellation: true,
+                        noiseSuppression: true,
+                        autoGainControl: true
+                    }
                 });
                 
                 // Display local stream
                 videoElement.srcObject = localStream;
+                videoElement.muted = true; // Mute for host (to avoid echo)
                 
-                // Create peer connection
-                peerConnection = new RTCPeerConnection({
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
+                // Initialize PeerJS connection
+                // Create a random peer ID
+                myPeerId = 'lionfuel-host-' + Math.random().toString(36).substr(2, 9);
+                peer = new Peer(myPeerId, {
+                    host: '0.peerjs.com',
+                    port: 443,
+                    path: '/',
+                    debug: 2
                 });
                 
-                // Add local tracks to peer connection
-                localStream.getTracks().forEach(track => {
-                    peerConnection.addTrack(track, localStream);
+                // Handle peer connection open
+                peer.on('open', function(id) {
+                    console.log('My peer ID is: ' + id);
+                    
+                    // Generate share link
+                    const shareLink = `${window.location.origin}${window.location.pathname}#${id}`;
+                    shareLinkInput.value = shareLink;
+                    
+                    // Display connection ID
+                    connectionIdSpan.textContent = id;
+                    connectionIdDisplay.style.display = 'block';
+                    
+                    // Update UI
+                    streamStatus.classList.add('active');
+                    streamStatusText.textContent = 'Live';
+                    goLiveBtn.disabled = true;
+                    goLiveBtn.innerHTML = '<i class="fas fa-broadcast-tower"></i> Live Now';
+                    goLiveBtn.classList.remove('btn-primary');
+                    goLiveBtn.classList.add('btn-success');
+                    
+                    isHost = true;
+                    showToast('Live stream started! Share the link with your audience.');
+                    
+                    // Enable recording button
+                    startRecordingBtn.disabled = false;
                 });
                 
-                // Create offer
-                const offer = await peerConnection.createOffer();
-                await peerConnection.setLocalDescription(offer);
+                // Handle incoming connections (viewers connecting)
+                peer.on('connection', function(conn) {
+                    console.log('Viewer connected:', conn.peer);
+                    
+                    // Store the connection
+                    activeConnections.push(conn);
+                    viewerConnections.set(conn.peer, {
+                        id: conn.peer,
+                        name: 'Viewer ' + (viewerConnections.size + 1),
+                        connectedAt: new Date()
+                    });
+                    
+                    // Update viewer list
+                    updateViewerList();
+                    
+                    // Update viewer count
+                    viewersCount.textContent = viewerConnections.size;
+                    
+                    // Show viewers container if we have viewers
+                    if (viewerConnections.size > 0) {
+                        viewersContainer.style.display = 'block';
+                    }
+                    
+                    // Handle connection close
+                    conn.on('close', function() {
+                        console.log('Viewer disconnected:', conn.peer);
+                        viewerConnections.delete(conn.peer);
+                        updateViewerList();
+                        viewersCount.textContent = viewerConnections.size;
+                        
+                        if (viewerConnections.size === 0) {
+                            viewersContainer.style.display = 'none';
+                        }
+                        
+                        showToast('A viewer disconnected');
+                    });
+                });
                 
-                // Generate share link
-                const offerString = JSON.stringify(peerConnection.localDescription);
-                const encodedOffer = btoa(offerString);
-                const shareLink = `${window.location.origin}${window.location.pathname}#${encodedOffer}`;
+                // Handle incoming calls (for video/audio streaming)
+                peer.on('call', function(call) {
+                    console.log('Receiving call from:', call.peer);
+                    
+                    // Answer the call with our local stream
+                    call.answer(localStream);
+                    
+                    // Handle the stream from the caller (not needed for host, but kept for symmetry)
+                    call.on('stream', function(remoteStream) {
+                        // In a real app, you might want to handle this
+                        console.log('Received stream from viewer (not used for host)');
+                    });
+                    
+                    // Handle call close
+                    call.on('close', function() {
+                        console.log('Call ended with:', call.peer);
+                    });
+                });
                 
-                shareLinkInput.value = shareLink;
-                
-                // Update UI
-                streamStatus.classList.add('active');
-                streamStatusText.textContent = 'Live';
-                goLiveBtn.disabled = true;
-                goLiveBtn.innerHTML = '<i class="fas fa-broadcast-tower"></i> Live Now';
-                goLiveBtn.classList.remove('btn-primary');
-                goLiveBtn.classList.add('btn-success');
-                
-                showToast('Live stream started! Share the link with your audience.');
-                
-                // Simulate some viewers joining
-                setTimeout(() => {
-                    viewerCount = 5;
-                    viewersCount.textContent = viewerCount;
-                }, 2000);
+                // Handle errors
+                peer.on('error', function(err) {
+                    console.error('PeerJS error:', err);
+                    showToast('Connection error: ' + err.message, true);
+                });
                 
             } catch (error) {
                 console.error('Error starting live stream:', error);
-                showToast('Error starting live stream. Please check your camera/microphone permissions.', true);
+                showToast('Error starting live stream: ' + error.message, true);
+                
+                // Suggest common fixes
+                if (error.name === 'NotFoundError') {
+                    showToast('No camera/microphone found. Please connect one and try again.', true);
+                } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                    showToast('Camera/microphone access denied. Please allow permissions and refresh.', true);
+                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                    showToast('Camera/microphone is already in use by another application.', true);
+                }
             }
         }
         
         // Viewer: Join Live Stream
         async function joinAsViewer() {
             try {
-                // Decode offer from URL hash
-                const encodedOffer = window.location.hash.substring(1);
-                const offerString = atob(encodedOffer);
-                const offer = JSON.parse(offerString);
+                const hostId = window.location.hash.substring(1);
+                if (!hostId) {
+                    console.log('No host ID in URL');
+                    return;
+                }
                 
-                // Create peer connection
-                peerConnection = new RTCPeerConnection({
-                    iceServers: [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun1.l.google.com:19302' }
-                    ]
-                });
+                console.log('Connecting to host:', hostId);
                 
-                // When remote track is received, display it
-                peerConnection.ontrack = (event) => {
-                    videoElement.srcObject = event.streams[0];
-                };
-                
-                // Set remote description
-                await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-                
-                // Create answer
-                const answer = await peerConnection.createAnswer();
-                await peerConnection.setLocalDescription(answer);
-                
-                // Update UI for viewer
-                streamStatus.classList.add('active');
-                streamStatusText.textContent = 'Watching Live';
+                // Hide the host button for viewers
                 goLiveBtn.style.display = 'none';
+                
+                // Change UI to indicate we're a viewer
+                streamStatusText.textContent = 'Connecting...';
+                document.querySelector('.live-badge').innerHTML = '<i class="fas fa-user"></i> VIEWER MODE';
                 document.querySelector('.live-badge').style.backgroundColor = '#2196F3';
                 
-                showToast('Connected to live stream!');
+                // Create viewer peer with random ID
+                myPeerId = 'viewer-' + Math.random().toString(36).substr(2, 9);
+                peer = new Peer(myPeerId, {
+                    host: '0.peerjs.com',
+                    port: 443,
+                    path: '/'
+                });
+                
+                peer.on('open', function(id) {
+                    console.log('Viewer connected with ID:', id);
+                    
+                    // Connect to host
+                    const conn = peer.connect(hostId);
+                    
+                    conn.on('open', function() {
+                        console.log('Connected to host');
+                        streamStatusText.textContent = 'Connected to Host';
+                        streamStatus.classList.add('active');
+                        
+                        // Call the host to get their stream
+                        const call = peer.call(hostId, null); // We don't send our stream to host
+                        
+                        call.on('stream', function(remoteStream) {
+                            console.log('Received stream from host');
+                            // Display host's stream
+                            videoElement.srcObject = remoteStream;
+                            videoElement.muted = false; // Unmute for viewers
+                            
+                            // Update UI
+                            streamStatusText.textContent = 'Watching Live';
+                            showToast('Connected to live stream!');
+                            
+                            // Enable recording button for viewers too
+                            startRecordingBtn.disabled = false;
+                        });
+                        
+                        call.on('close', function() {
+                            console.log('Call closed');
+                            showToast('Host ended the stream', true);
+                            streamStatusText.textContent = 'Stream Ended';
+                            streamStatus.classList.remove('active');
+                        });
+                        
+                        call.on('error', function(err) {
+                            console.error('Call error:', err);
+                            showToast('Connection error: ' + err.message, true);
+                        });
+                    });
+                    
+                    conn.on('error', function(err) {
+                        console.error('Connection error:', err);
+                        showToast('Cannot connect to host. They may be offline.', true);
+                        streamStatusText.textContent = 'Connection Failed';
+                    });
+                });
+                
+                peer.on('error', function(err) {
+                    console.error('PeerJS error:', err);
+                    showToast('Connection error: ' + err.message, true);
+                    
+                    if (err.type === 'peer-unavailable') {
+                        showToast('Host is not available. Make sure they started the stream.', true);
+                    }
+                });
                 
             } catch (error) {
                 console.error('Error joining live stream:', error);
-                showToast('Error joining live stream. The host may have ended the stream.', true);
+                showToast('Error joining: ' + error.message, true);
             }
         }
         
         // Start Recording
         function startRecording() {
-            if (!localStream && !videoElement.srcObject) {
-                showToast('Please start a live stream first or connect as a viewer.', true);
+            // Check if we have a stream to record
+            const streamToRecord = localStream || videoElement.srcObject;
+            
+            if (!streamToRecord) {
+                showToast('No stream available to record. Start or join a stream first.', true);
                 return;
             }
             
-            const streamToRecord = localStream || videoElement.srcObject;
-            
             try {
                 recordedChunks = [];
-                mediaRecorder = new MediaRecorder(streamToRecord, {
-                    mimeType: 'video/webm;codecs=vp9,opus'
-                });
+                
+                // Try different MIME types for compatibility
+                const options = { mimeType: 'video/webm;codecs=vp9,opus' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options.mimeType = 'video/webm;codecs=vp8,opus';
+                }
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options.mimeType = 'video/webm';
+                }
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options.mimeType = '';
+                }
+                
+                mediaRecorder = new MediaRecorder(streamToRecord, options);
                 
                 mediaRecorder.ondataavailable = (event) => {
-                    if (event.data.size > 0) {
+                    if (event.data && event.data.size > 0) {
                         recordedChunks.push(event.data);
                     }
                 };
                 
                 mediaRecorder.onstop = () => {
                     // Create video blob
-                    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const blob = new Blob(recordedChunks, { 
+                        type: mediaRecorder.mimeType || 'video/webm' 
+                    });
                     
                     // Create download link
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = `lionfuel-podcast-${new Date().toISOString().slice(0, 10)}.webm`;
+                    
+                    // Create filename with timestamp
+                    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:]/g, '-');
+                    a.download = `lionfuel-podcast-${timestamp}.webm`;
+                    
                     document.body.appendChild(a);
                     a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
+                    
+                    // Clean up
+                    setTimeout(() => {
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    }, 100);
                     
                     // Update UI
                     recordingStatus.classList.remove('recording');
@@ -731,10 +919,24 @@
                     recordingTimer.classList.remove('active');
                     clearInterval(timerInterval);
                     
-                    showToast('Recording saved! Check your downloads.');
+                    showToast('Recording saved! Check your downloads folder.');
                 };
                 
-                mediaRecorder.start();
+                mediaRecorder.onerror = (event) => {
+                    console.error('MediaRecorder error:', event.error);
+                    showToast('Recording error: ' + event.error.name, true);
+                    
+                    // Reset UI
+                    recordingStatus.classList.remove('recording');
+                    recordingStatusText.textContent = 'Not Recording';
+                    startRecordingBtn.disabled = false;
+                    stopRecordingBtn.disabled = true;
+                    recordingTimer.classList.remove('active');
+                    clearInterval(timerInterval);
+                };
+                
+                // Start recording with timeslice to ensure data is available regularly
+                mediaRecorder.start(1000); // Timeslice of 1 second
                 recordingStartTime = Date.now();
                 
                 // Start timer
@@ -752,7 +954,7 @@
                 
             } catch (error) {
                 console.error('Error starting recording:', error);
-                showToast('Error starting recording. Please try again.', true);
+                showToast('Error starting recording: ' + error.message, true);
             }
         }
         
@@ -771,10 +973,10 @@
             timerDisplay.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
         
-        // Toggle Camera (for host)
+        // Toggle Camera (for host only)
         async function toggleCamera() {
             if (!localStream) {
-                showToast('Start a live stream first to toggle camera', true);
+                showToast('You need to be a host to toggle camera', true);
                 return;
             }
             
@@ -783,6 +985,37 @@
                 videoTrack.enabled = !videoTrack.enabled;
                 showToast(`Camera ${videoTrack.enabled ? 'enabled' : 'disabled'}`);
             }
+        }
+        
+        // Update viewer list display
+        function updateViewerList() {
+            viewerList.innerHTML = '';
+            viewerConnections.forEach((viewer, peerId) => {
+                const li = document.createElement('li');
+                li.className = 'viewer-item';
+                li.innerHTML = `
+                    <i class="fas fa-user-circle" style="color: #FF6B00;"></i>
+                    <span>${viewer.name}</span>
+                    <small style="margin-left: auto; color: #B0B0B0;">${formatTimeAgo(viewer.connectedAt)}</small>
+                `;
+                viewerList.appendChild(li);
+            });
+        }
+        
+        // Format time ago
+        function formatTimeAgo(date) {
+            const seconds = Math.floor((new Date() - date) / 1000);
+            
+            if (seconds < 60) return 'just now';
+            
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `${minutes}m ago`;
+            
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `${hours}h ago`;
+            
+            const days = Math.floor(hours / 24);
+            return `${days}d ago`;
         }
         
         // Copy share link to clipboard
@@ -796,7 +1029,7 @@
                 await navigator.clipboard.writeText(shareLinkInput.value);
                 copyBtn.classList.add('copied');
                 copyBtn.innerHTML = '<i class="fas fa-check"></i> Copied!';
-                showToast('Link copied to clipboard!');
+                showToast('Link copied to clipboard! Share it with your audience.');
                 
                 setTimeout(() => {
                     copyBtn.classList.remove('copied');
@@ -804,7 +1037,10 @@
                 }, 3000);
             } catch (error) {
                 console.error('Error copying to clipboard:', error);
-                showToast('Error copying link. Please copy manually.', true);
+                // Fallback for browsers that don't support clipboard API
+                shareLinkInput.select();
+                document.execCommand('copy');
+                showToast('Link copied to clipboard!');
             }
         }
         
@@ -822,26 +1058,8 @@
             
             setTimeout(() => {
                 toast.classList.remove('show');
-            }, 3000);
+            }, 4000);
         }
-        
-        // Simulate viewer count for demo purposes
-        setInterval(() => {
-            if (peerConnection && (localStream || videoElement.srcObject)) {
-                // Randomly add or remove viewers for demo
-                viewerCount += Math.floor(Math.random() * 3) - 1;
-                if (viewerCount < 0) viewerCount = 0;
-                viewersCount.textContent = viewerCount;
-                
-                // Update viewer status dot
-                const viewersStatus = document.getElementById('viewersStatus');
-                if (viewerCount > 0) {
-                    viewersStatus.classList.add('active');
-                } else {
-                    viewersStatus.classList.remove('active');
-                }
-            }
-        }, 8000);
     </script>
 </body>
 </html>
