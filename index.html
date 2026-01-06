@@ -1,702 +1,89 @@
+<!-- Save as: ultra-simple-stream.html -->
 <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>LionFuel Live Stream - WORKING VERSION</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            background: #0a0a0a; 
-            color: white; 
-            font-family: Arial, sans-serif; 
-            padding: 20px;
-            min-height: 100vh;
-        }
-        .container { max-width: 1200px; margin: 0 auto; }
-        
-        header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center;
-            padding: 20px 0; 
-            border-bottom: 2px solid #ff6b00;
-            margin-bottom: 30px;
-        }
-        .logo { 
-            font-size: 32px; 
-            font-weight: bold; 
-            color: #ff6b00; 
-        }
-        .live-badge {
-            background: #f44336;
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: bold;
-            animation: pulse 2s infinite;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.7; }
-            100% { opacity: 1; }
-        }
-        
-        .main { display: flex; gap: 30px; margin-bottom: 30px; }
-        @media (max-width: 768px) { .main { flex-direction: column; } }
-        
-        .video-section { flex: 3; }
-        .sidebar { flex: 1; min-width: 300px; }
-        
-        .video-container {
-            background: #1a1a1a;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        .video-header {
-            padding: 20px;
-            background: rgba(0,0,0,0.8);
-            border-bottom: 1px solid #ff6b00;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        #videoElement {
-            width: 100%;
-            height: 500px;
-            background: #000;
-            display: block;
-        }
-        .controls {
-            padding: 20px;
-            background: rgba(0,0,0,0.8);
-            display: flex;
-            flex-wrap: wrap;
-            gap: 15px;
-        }
-        .btn {
-            padding: 15px 25px;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            flex: 1;
-            min-width: 200px;
-            justify-content: center;
-            font-size: 16px;
-            transition: all 0.3s;
-        }
-        .btn:hover { transform: translateY(-2px); }
-        .btn-primary { background: #ff6b00; color: white; }
-        .btn-success { background: #4CAF50; color: white; }
-        .btn-danger { background: #f44336; color: white; }
-        .btn-secondary { background: #333; color: white; }
-        
-        .panel {
-            background: #1a1a1a;
-            border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-        }
-        .panel h3 { 
-            margin-bottom: 15px; 
-            color: #ff6b00;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .share-box input {
-            width: 100%;
-            padding: 12px;
-            background: #222;
-            border: 1px solid #444;
-            border-radius: 8px;
-            color: white;
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
-        .copy-btn {
-            width: 100%;
-            padding: 12px;
-            background: #333;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            margin-bottom: 20px;
-        }
-        .copy-btn:hover { background: #444; }
-        .copy-btn.copied { background: #4CAF50; }
-        
-        .status-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid #333;
-        }
-        .status-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            background: #666;
-            display: inline-block;
-            margin-right: 10px;
-        }
-        .status-dot.active { background: #4CAF50; box-shadow: 0 0 10px #4CAF50; }
-        .status-dot.recording { background: #f44336; animation: pulse 1s infinite; }
-        
-        .debug-info {
-            background: rgba(255, 107, 0, 0.1);
-            border: 1px dashed #ff6b00;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 20px;
-            font-family: monospace;
-            font-size: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        .toast {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background: #ff6b00;
-            color: white;
-            padding: 15px 25px;
-            border-radius: 8px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
-            transform: translateY(100px);
-            opacity: 0;
-            transition: transform 0.4s, opacity 0.4s;
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .toast.show { transform: translateY(0); opacity: 1; }
-        .toast.error { background: #f44336; }
-        
-        .whatsapp-box {
-            background: linear-gradient(135deg, #25D366, #128C7E);
-            color: white;
-            padding: 25px;
-            border-radius: 12px;
-            text-align: center;
-            margin-top: 20px;
-        }
-        .whatsapp-box a {
-            display: inline-block;
-            background: white;
-            color: #128C7E;
-            padding: 15px 25px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: bold;
-            margin-top: 15px;
-            transition: transform 0.3s;
-        }
-        .whatsapp-box a:hover { transform: translateY(-3px); }
-        
-        footer {
-            text-align: center;
-            padding: 20px;
-            border-top: 1px solid #333;
-            color: #888;
-            font-size: 14px;
-            margin-top: 30px;
-        }
-    </style>
-</head>
+<html>
 <body>
-    <div class="container">
-        <header>
-            <div class="logo">LionFuel LIVE</div>
-            <div class="live-badge" id="statusBadge">
-                <i class="fas fa-circle"></i> OFFLINE
-            </div>
-        </header>
-        
-        <div class="main">
-            <div class="video-section">
-                <div class="video-container">
-                    <div class="video-header">
-                        <h2><i class="fas fa-video"></i> Live Stream</h2>
-                        <div id="connectionStatus">Status: Not connected</div>
-                    </div>
-                    
-                    <video id="videoElement" autoplay playsinline></video>
-                    
-                    <div class="controls">
-                        <button class="btn btn-primary" onclick="goLive()" id="goLiveBtn">
-                            <i class="fas fa-broadcast-tower"></i> START LIVE STREAM
-                        </button>
-                        <button class="btn btn-success" onclick="startRecording()" id="recordBtn" disabled>
-                            <i class="fas fa-circle"></i> RECORD
-                        </button>
-                        <button class="btn btn-danger" onclick="stopStream()" id="stopBtn">
-                            <i class="fas fa-stop"></i> STOP
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="sidebar">
-                <div class="panel">
-                    <h3><i class="fas fa-share"></i> Share Your Stream</h3>
-                    <div class="share-box">
-                        <input type="text" id="shareLink" readonly placeholder="Link will appear after starting stream">
-                        <button class="copy-btn" onclick="copyLink()" id="copyBtn">
-                            <i class="fas fa-copy"></i> COPY LINK
-                        </button>
-                        
-                        <h4>Connection Status:</h4>
-                        <div class="status-item">
-                            <span><span class="status-dot" id="streamDot"></span> Your Stream</span>
-                            <span id="streamStatusText">OFF</span>
-                        </div>
-                        <div class="status-item">
-                            <span><span class="status-dot" id="peerDot"></span> Peer Connection</span>
-                            <span id="peerStatusText">Disconnected</span>
-                        </div>
-                        <div class="status-item">
-                            <span><span class="status-dot" id="viewerDot"></span> Viewers</span>
-                            <span id="viewerCount">0</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="panel">
-                    <h3><i class="fas fa-bug"></i> Debug Info</h3>
-                    <div class="debug-info" id="debugInfo">
-                        Waiting for connection...
-                    </div>
-                </div>
-                
-                <div class="whatsapp-box">
-                    <i class="fab fa-whatsapp" style="font-size: 48px;"></i>
-                    <h3>Need Help?</h3>
-                    <p>Contact us directly on WhatsApp for immediate support:</p>
-                    <a href="https://wa.me/23052595505?text=Hello%20LionFuel,%20I%20need%20help%20with%20live%20streaming" target="_blank">
-                        <i class="fab fa-whatsapp"></i> WhatsApp Support
-                    </a>
-                </div>
-            </div>
-        </div>
-        
-        <footer>
-            <p>© 2023 LionFuel Podcast Network | Live Streaming Solution</p>
-            <p style="margin-top: 5px; font-size: 12px;">Using PeerJS for P2P streaming</p>
-        </footer>
+    <h1>LionFuel Ultra-Simple Stream</h1>
+    <button onclick="start()">START STREAM</button>
+    <button onclick="stop()" style="background:red;color:white;">STOP</button>
+    <br><br>
+    <video id="myVideo" autoplay style="width:80%;border:3px solid orange;"></video>
+    <br><br>
+    <div id="linkBox" style="background:yellow;padding:20px;display:none;">
+        <h3>👇 SEND THIS LINK TO VIEWER 👇</h3>
+        <input id="link" style="width:400px;padding:10px;">
+        <button onclick="copy()" style="background:green;color:white;">COPY</button>
+        <p><strong>Viewer must use CHROME browser!</strong></p>
     </div>
     
-    <div class="toast" id="toast">
-        <i class="fas fa-info-circle"></i>
-        <span id="toastMessage">Message</span>
-    </div>
-    
+    <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script>
-        // ========== SIMPLE WORKING VERSION ==========
-        let peer = null;
-        let localStream = null;
-        let hostPeerId = null;
-        let viewerCount = 0;
-        let isHost = false;
+        let myStream;
+        let myPeer;
         
-        const videoElement = document.getElementById('videoElement');
-        const shareLinkInput = document.getElementById('shareLink');
-        const debugInfo = document.getElementById('debugInfo');
-        
-        // Add debug log
-        function logDebug(message) {
-            const timestamp = new Date().toLocaleTimeString();
-            debugInfo.innerHTML = `[${timestamp}] ${message}<br>` + debugInfo.innerHTML;
-            console.log(message);
-        }
-        
-        function showToast(message, isError = false) {
-            const toast = document.getElementById('toast');
-            const toastMessage = document.getElementById('toastMessage');
+        async function start() {
+            // 1. Get camera
+            myStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
             
-            toastMessage.textContent = message;
-            toast.className = 'toast';
-            toast.classList.add(isError ? 'error' : 'show');
-            if (!isError) toast.classList.add('show');
+            // 2. Show my video
+            document.getElementById('myVideo').srcObject = myStream;
+            document.getElementById('myVideo').muted = true;
             
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 4000);
-        }
-        
-        // ========== HOST: START STREAM ==========
-        async function goLive() {
-            try {
-                logDebug("Starting live stream...");
-                
-                // 1. Get camera/microphone
-                logDebug("Requesting camera/microphone access...");
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    },
-                    audio: true
-                });
-                
-                logDebug("Camera/microphone access granted");
-                videoElement.srcObject = localStream;
-                videoElement.muted = true; // Mute for host
-                
-                // 2. Create Peer connection
-                logDebug("Creating PeerJS connection...");
-                
-                // Generate a simple random ID
-                const randomId = 'lionfuel-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
-                hostPeerId = randomId;
-                
-                peer = new Peer(hostPeerId, {
-                    host: '0.peerjs.com',
-                    port: 443,
-                    path: '/',
-                    debug: 3, // Maximum debugging
-                    config: {
-                        'iceServers': [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun1.l.google.com:19302' },
-                            { urls: 'stun:stun2.l.google.com:19302' },
-                            { urls: 'stun:stun3.l.google.com:19302' },
-                            { urls: 'stun:stun4.l.google.com:19302' }
-                        ]
-                    }
-                });
-                
-                // 3. Handle Peer events
-                peer.on('open', (id) => {
-                    logDebug(`Peer connected with ID: ${id}`);
-                    
-                    // Generate shareable link
-                    const shareLink = `${window.location.origin}${window.location.pathname}?watch=${id}`;
-                    shareLinkInput.value = shareLink;
-                    
-                    // Update UI
-                    updateStatus('live');
-                    document.getElementById('goLiveBtn').disabled = true;
-                    document.getElementById('goLiveBtn').innerHTML = '<i class="fas fa-broadcast-tower"></i> LIVE NOW';
-                    document.getElementById('recordBtn').disabled = false;
-                    
-                    showToast(`Live! Share this link: ${window.location.origin}${window.location.pathname}?watch=${id}`);
-                    
-                    isHost = true;
-                });
-                
-                peer.on('connection', (conn) => {
-                    logDebug(`Viewer connected: ${conn.peer}`);
-                    viewerCount++;
-                    updateViewerCount();
-                    showToast(`Viewer ${viewerCount} connected`);
-                    
-                    // Send a welcome message
-                    conn.send('Welcome to LionFuel Live!');
-                    
-                    conn.on('close', () => {
-                        logDebug(`Viewer disconnected: ${conn.peer}`);
-                        viewerCount = Math.max(0, viewerCount - 1);
-                        updateViewerCount();
-                    });
-                });
-                
-                // Handle incoming calls from viewers
-                peer.on('call', (call) => {
-                    logDebug(`Receiving video call from: ${call.peer}`);
-                    
-                    // Answer with local stream
-                    call.answer(localStream);
-                    
-                    call.on('stream', (remoteStream) => {
-                        logDebug(`Stream established with ${call.peer}`);
-                        // For host, we don't display viewer's stream
-                    });
-                    
-                    call.on('close', () => {
-                        logDebug(`Call ended with ${call.peer}`);
-                    });
-                    
-                    call.on('error', (err) => {
-                        logDebug(`Call error: ${err}`);
-                    });
-                });
-                
-                peer.on('error', (err) => {
-                    logDebug(`PeerJS Error: ${err.type} - ${err.message}`);
-                    showToast(`Connection error: ${err.message}`, true);
-                    
-                    if (err.type === 'peer-unavailable') {
-                        showToast("Peer server unavailable. Try refreshing.", true);
-                    } else if (err.type === 'network') {
-                        showToast("Network error. Check your internet.", true);
-                    } else if (err.type === 'browser-incompatible') {
-                        showToast("Browser not supported. Try Chrome or Firefox.", true);
-                    }
-                });
-                
-                logDebug("Waiting for Peer connection...");
-                
-            } catch (error) {
-                logDebug(`ERROR: ${error.name} - ${error.message}`);
-                
-                if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-                    showToast("No camera/microphone found. Connect one and try again.", true);
-                } else if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-                    showToast("Camera/microphone permission denied. Please allow access.", true);
-                } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-                    showToast("Camera/microphone in use by another app. Close other apps.", true);
-                } else if (error.name === 'OverconstrainedError') {
-                    showToast("Camera doesn't support requested settings. Trying lower quality...", true);
-                    // Try again with lower quality
-                    setTimeout(() => goLiveWithLowerQuality(), 1000);
-                } else {
-                    showToast(`Error: ${error.message}`, true);
-                }
-            }
-        }
-        
-        // Alternative with lower quality
-        async function goLiveWithLowerQuality() {
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: { width: 640, height: 480 },
-                    audio: true
-                });
-                videoElement.srcObject = localStream;
-                videoElement.muted = true;
-                
-                // Continue with peer connection...
-                const randomId = 'lionfuel-' + Date.now();
-                peer = new Peer(randomId, { host: '0.peerjs.com', port: 443, path: '/' });
-                
-                peer.on('open', (id) => {
-                    const shareLink = `${window.location.origin}${window.location.pathname}?watch=${id}`;
-                    shareLinkInput.value = shareLink;
-                    updateStatus('live');
-                    showToast("Live with lower quality!");
-                });
-                
-            } catch (error) {
-                showToast("Failed even with lower quality. Try a different browser.", true);
-            }
-        }
-        
-        // ========== VIEWER: JOIN STREAM ==========
-        function checkIfViewer() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const watchId = urlParams.get('watch');
+            // 3. Create connection
+            myPeer = new Peer('lion-' + Date.now(), {
+                host: '0.peerjs.com',
+                port: 443,
+                config: { iceServers: [
+                    { urls: 'stun:stun.l.google.com:19302' },
+                    { urls: 'stun:stun1.l.google.com:19302' }
+                ]}
+            });
             
-            if (watchId && watchId.length > 5) {
-                logDebug(`Viewer mode detected. Connecting to host: ${watchId}`);
-                joinAsViewer(watchId);
-                return true;
-            }
-            return false;
-        }
-        
-        async function joinAsViewer(hostId) {
-            try {
-                logDebug(`Attempting to connect to host: ${hostId}`);
-                
-                // Create viewer peer with random ID
-                const viewerId = 'viewer-' + Date.now() + '-' + Math.random().toString(36).substr(2, 3);
-                peer = new Peer(viewerId, {
-                    host: '0.peerjs.com',
-                    port: 443,
-                    path: '/',
-                    debug: 3
-                });
-                
-                peer.on('open', () => {
-                    logDebug(`Viewer connected with ID: ${viewerId}`);
-                    updateStatus('viewer');
-                    
-                    // Call the host
-                    logDebug(`Calling host: ${hostId}`);
-                    const call = peer.call(hostId);
-                    
-                    if (!call) {
-                        logDebug("Failed to create call object");
-                        showToast("Failed to connect to host", true);
-                        return;
-                    }
-                    
-                    call.on('stream', (remoteStream) => {
-                        logDebug("Received stream from host!");
-                        videoElement.srcObject = remoteStream;
-                        videoElement.muted = false;
-                        updateStatus('watching');
-                        showToast("Connected to live stream!");
-                    });
-                    
-                    call.on('close', () => {
-                        logDebug("Call closed by host");
-                        showToast("Host ended the stream", true);
-                        updateStatus('disconnected');
-                    });
-                    
-                    call.on('error', (err) => {
-                        logDebug(`Call error: ${err}`);
-                        showToast("Failed to connect to stream", true);
-                    });
-                });
-                
-                peer.on('error', (err) => {
-                    logDebug(`Peer error: ${err.type} - ${err.message}`);
-                    
-                    if (err.type === 'peer-unavailable') {
-                        showToast("Host is not available. They may not be live.", true);
-                    } else if (err.type === 'network') {
-                        showToast("Network error. Check your internet.", true);
-                    }
-                });
-                
-            } catch (error) {
-                logDebug(`Viewer error: ${error.message}`);
-                showToast("Error connecting: " + error.message, true);
-            }
-        }
-        
-        // ========== HELPER FUNCTIONS ==========
-        function updateStatus(status) {
-            const badge = document.getElementById('statusBadge');
-            const streamDot = document.getElementById('streamDot');
-            const streamText = document.getElementById('streamStatusText');
-            const peerDot = document.getElementById('peerDot');
-            const peerText = document.getElementById('peerStatusText');
+            myPeer.on('open', (id) => {
+                // 4. Generate link
+                const link = window.location.href.split('?')[0] + '?watch=' + id;
+                document.getElementById('link').value = link;
+                document.getElementById('linkBox').style.display = 'block';
+                alert('Send this link to viewer: ' + link);
+            });
             
-            switch(status) {
-                case 'live':
-                    badge.innerHTML = '<i class="fas fa-circle"></i> LIVE NOW';
-                    badge.style.background = '#f44336';
-                    streamDot.className = 'status-dot active';
-                    streamText.textContent = 'LIVE';
-                    peerDot.className = 'status-dot active';
-                    peerText.textContent = 'Connected';
-                    break;
-                    
-                case 'viewer':
-                    badge.innerHTML = '<i class="fas fa-user"></i> VIEWER MODE';
-                    badge.style.background = '#2196F3';
-                    streamDot.className = 'status-dot';
-                    streamText.textContent = 'Connecting...';
-                    break;
-                    
-                case 'watching':
-                    badge.innerHTML = '<i class="fas fa-eye"></i> WATCHING LIVE';
-                    badge.style.background = '#4CAF50';
-                    streamDot.className = 'status-dot active';
-                    streamText.textContent = 'WATCHING';
-                    peerDot.className = 'status-dot active';
-                    peerText.textContent = 'Connected';
-                    break;
-                    
-                default:
-                    badge.innerHTML = '<i class="fas fa-circle"></i> OFFLINE';
-                    badge.style.background = '#666';
-                    streamDot.className = 'status-dot';
-                    streamText.textContent = 'OFF';
-                    peerDot.className = 'status-dot';
-                    peerText.textContent = 'Disconnected';
-            }
+            // 5. Handle viewer
+            myPeer.on('call', (call) => {
+                call.answer(myStream);
+                alert('Viewer connected!');
+            });
         }
         
-        function updateViewerCount() {
-            document.getElementById('viewerCount').textContent = viewerCount;
-            const viewerDot = document.getElementById('viewerDot');
-            viewerDot.className = viewerCount > 0 ? 'status-dot active' : 'status-dot';
-        }
-        
-        function copyLink() {
-            if (!shareLinkInput.value || shareLinkInput.value.includes('will appear')) {
-                showToast("Start a stream first to get a link", true);
-                return;
-            }
-            
-            shareLinkInput.select();
+        function copy() {
+            const link = document.getElementById('link');
+            link.select();
             document.execCommand('copy');
-            
-            const copyBtn = document.getElementById('copyBtn');
-            copyBtn.innerHTML = '<i class="fas fa-check"></i> COPIED!';
-            copyBtn.classList.add('copied');
-            
-            showToast("Link copied! Send it to your viewers");
-            
-            setTimeout(() => {
-                copyBtn.innerHTML = '<i class="fas fa-copy"></i> COPY LINK';
-                copyBtn.classList.remove('copied');
-            }, 3000);
+            alert('Copied! Send this to viewer.');
         }
         
-        function startRecording() {
-            if (!localStream) {
-                showToast("Start a stream first to record", true);
-                return;
-            }
-            showToast("Recording started (simulated)", false);
+        function stop() {
+            if (myStream) myStream.getTracks().forEach(t => t.stop());
+            if (myPeer) myPeer.destroy();
+            document.getElementById('myVideo').srcObject = null;
+            document.getElementById('linkBox').style.display = 'none';
         }
         
-        function stopStream() {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-            }
-            
-            if (peer) {
-                peer.destroy();
-                peer = null;
-            }
-            
-            videoElement.srcObject = null;
-            updateStatus('offline');
-            document.getElementById('goLiveBtn').disabled = false;
-            document.getElementById('goLiveBtn').innerHTML = '<i class="fas fa-broadcast-tower"></i> START LIVE STREAM';
-            document.getElementById('recordBtn').disabled = true;
-            
-            viewerCount = 0;
-            updateViewerCount();
-            
-            showToast("Stream stopped");
+        // Auto-join as viewer
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('watch')) {
+            document.body.innerHTML = '<h1>Connecting to LionFuel...</h1><video id="v" autoplay style="width:100%"></video>';
+            const peer = new Peer('viewer-' + Date.now(), {host: '0.peerjs.com', port: 443});
+            peer.on('open', () => {
+                const call = peer.call(params.get('watch'));
+                call.on('stream', (stream) => {
+                    document.getElementById('v').srcObject = stream;
+                    document.body.innerHTML = '<h1>LionFuel Live 🔴</h1><video autoplay style="width:100%" id="v"></video>';
+                    document.getElementById('v').srcObject = stream;
+                });
+            });
         }
-        
-        // ========== INITIALIZE ==========
-        window.addEventListener('load', function() {
-            logDebug("Page loaded. Checking if viewer...");
-            
-            // Check if we're a viewer
-            if (!checkIfViewer()) {
-                logDebug("Host mode. Ready to go live.");
-                updateStatus('ready');
-            }
-            
-            // Auto-refresh debug info
-            setInterval(() => {
-                if (peer && peer.id) {
-                    document.getElementById('connectionStatus').textContent = `ID: ${peer.id.substring(0, 10)}...`;
-                }
-            }, 5000);
-        });
-        
-        // Handle page close
-        window.addEventListener('beforeunload', function() {
-            if (peer) {
-                peer.destroy();
-            }
-        });
     </script>
 </body>
 </html>
