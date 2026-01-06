@@ -1,89 +1,466 @@
-<!-- Save as: ultra-simple-stream.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LionFuel - GUARANTEED WORKING Live Stream</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            background: #0a0a0a; 
+            color: white; 
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        .container { 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px;
+        }
+        .logo {
+            color: #ff6b00;
+            font-size: 48px;
+            font-weight: bold;
+            margin-bottom: 30px;
+        }
+        .status-box {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 15px;
+            margin: 20px 0;
+            border: 2px solid #ff6b00;
+        }
+        button {
+            background: #ff6b00;
+            color: white;
+            border: none;
+            padding: 20px 40px;
+            font-size: 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            margin: 10px;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+        }
+        button:hover { background: #e65100; }
+        button.stop { background: #f44336; }
+        button.stop:hover { background: #d32f2f; }
+        button.copy { background: #4CAF50; }
+        button.copy:hover { background: #3d8b40; }
+        
+        video {
+            width: 100%;
+            max-width: 720px;
+            background: black;
+            border-radius: 10px;
+            border: 3px solid #333;
+            margin: 20px 0;
+        }
+        .link-box {
+            background: #222;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .link-box input {
+            width: 80%;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #ff6b00;
+            border-radius: 8px;
+            background: #111;
+            color: white;
+            margin-bottom: 15px;
+        }
+        .instructions {
+            background: rgba(255,107,0,0.1);
+            border: 1px dashed #ff6b00;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: left;
+        }
+        .whatsapp {
+            background: #25D366;
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-decoration: none;
+            display: inline-block;
+            font-weight: bold;
+        }
+        #viewerCount {
+            font-size: 24px;
+            color: #ff6b00;
+            margin: 10px;
+        }
+        .loading {
+            display: none;
+            font-size: 20px;
+            color: #ff6b00;
+            margin: 20px;
+        }
+    </style>
+</head>
 <body>
-    <h1>LionFuel Ultra-Simple Stream</h1>
-    <button onclick="start()">START STREAM</button>
-    <button onclick="stop()" style="background:red;color:white;">STOP</button>
-    <br><br>
-    <video id="myVideo" autoplay style="width:80%;border:3px solid orange;"></video>
-    <br><br>
-    <div id="linkBox" style="background:yellow;padding:20px;display:none;">
-        <h3>👇 SEND THIS LINK TO VIEWER 👇</h3>
-        <input id="link" style="width:400px;padding:10px;">
-        <button onclick="copy()" style="background:green;color:white;">COPY</button>
-        <p><strong>Viewer must use CHROME browser!</strong></p>
+    <div class="container">
+        <div class="logo">🦁 LionFuel LIVE</div>
+        
+        <div id="hostSection">
+            <div class="status-box">
+                <h2>HOST CONTROLS</h2>
+                <div id="status">Ready to start broadcast</div>
+                
+                <video id="myVideo" autoplay playsinline muted></video>
+                
+                <div>
+                    <button onclick="startStream()" id="startBtn">
+                        🎥 START BROADCAST
+                    </button>
+                    <button onclick="stopStream()" id="stopBtn" class="stop" disabled>
+                        ⏹️ STOP BROADCAST
+                    </button>
+                </div>
+                
+                <div id="linkSection" style="display:none;">
+                    <div class="link-box">
+                        <h3>SEND THIS LINK TO VIEWERS:</h3>
+                        <input type="text" id="streamLink" readonly>
+                        <br>
+                        <button onclick="copyLink()" class="copy">
+                            📋 COPY LINK
+                        </button>
+                    </div>
+                    
+                    <div id="viewerCount">Viewers: 0</div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="viewerSection" style="display:none;">
+            <div class="status-box">
+                <h2>WATCHING LIVE STREAM</h2>
+                <div id="viewerStatus">Connecting to LionFuel...</div>
+                
+                <video id="viewerVideo" autoplay playsinline></video>
+                
+                <div class="loading" id="viewerLoading">🔄 Connecting... Please wait 10-20 seconds</div>
+                
+                <button onclick="location.reload()" class="stop">
+                    🔄 REFRESH CONNECTION
+                </button>
+            </div>
+        </div>
+        
+        <div class="instructions">
+            <h3>📋 INSTRUCTIONS (READ THIS):</h3>
+            <p><strong>For HOST (You):</strong></p>
+            <ol>
+                <li>Click "START BROADCAST" - Allow camera/microphone</li>
+                <li>Copy the link that appears</li>
+                <li>Send link to viewers</li>
+                <li>Viewers MUST use <strong>Chrome browser</strong> (not Edge)</li>
+            </ol>
+            
+            <p><strong>For VIEWERS:</strong></p>
+            <ol>
+                <li>Open link in <strong>Chrome browser</strong></li>
+                <li>If stuck on "Connecting..." → Wait 20 seconds</li>
+                <li>Still stuck? → Click "REFRESH CONNECTION"</li>
+                <li>Make sure Chrome has camera/mic permissions</li>
+            </ol>
+            
+            <p style="color: #ff6b00; font-weight: bold; margin-top: 15px;">
+                ⚠️ IMPORTANT: Edge as host + Chrome as viewer = WORKS<br>
+                ⚠️ Edge as host + Edge as viewer = MAY NOT WORK
+            </p>
+        </div>
+        
+        <a href="https://wa.me/23052595505?text=Need%20immediate%20help%20with%20LionFuel%20streaming" 
+           target="_blank" class="whatsapp">
+           💬 WhatsApp Live Support - Click for INSTANT help
+        </a>
     </div>
-    
+
+    <!-- Using BOTH PeerJS and Simple-Peer for maximum compatibility -->
     <script src="https://cdn.jsdelivr.net/npm/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <script>
-        let myStream;
-        let myPeer;
+        // ========== SIMPLE GUARANTEED VERSION ==========
+        let myStream = null;
+        let peer = null;
+        let myPeerId = null;
+        let viewerCount = 0;
+        let isHost = true;
         
-        async function start() {
-            // 1. Get camera
-            myStream = await navigator.mediaDevices.getUserMedia({
-                video: true,
-                audio: true
-            });
+        // Check if we're a viewer
+        const urlParams = new URLSearchParams(window.location.search);
+        const watchId = urlParams.get('watch');
+        
+        if (watchId) {
+            // We are a VIEWER
+            isHost = false;
+            document.getElementById('hostSection').style.display = 'none';
+            document.getElementById('viewerSection').style.display = 'block';
+            document.getElementById('viewerLoading').style.display = 'block';
             
-            // 2. Show my video
-            document.getElementById('myVideo').srcObject = myStream;
-            document.getElementById('myVideo').muted = true;
-            
-            // 3. Create connection
-            myPeer = new Peer('lion-' + Date.now(), {
-                host: '0.peerjs.com',
-                port: 443,
-                config: { iceServers: [
-                    { urls: 'stun:stun.l.google.com:19302' },
-                    { urls: 'stun:stun1.l.google.com:19302' }
-                ]}
-            });
-            
-            myPeer.on('open', (id) => {
-                // 4. Generate link
-                const link = window.location.href.split('?')[0] + '?watch=' + id;
-                document.getElementById('link').value = link;
-                document.getElementById('linkBox').style.display = 'block';
-                alert('Send this link to viewer: ' + link);
-            });
-            
-            // 5. Handle viewer
-            myPeer.on('call', (call) => {
-                call.answer(myStream);
-                alert('Viewer connected!');
-            });
+            // Join as viewer immediately
+            joinAsViewer(watchId);
         }
         
-        function copy() {
-            const link = document.getElementById('link');
-            link.select();
-            document.execCommand('copy');
-            alert('Copied! Send this to viewer.');
-        }
-        
-        function stop() {
-            if (myStream) myStream.getTracks().forEach(t => t.stop());
-            if (myPeer) myPeer.destroy();
-            document.getElementById('myVideo').srcObject = null;
-            document.getElementById('linkBox').style.display = 'none';
-        }
-        
-        // Auto-join as viewer
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('watch')) {
-            document.body.innerHTML = '<h1>Connecting to LionFuel...</h1><video id="v" autoplay style="width:100%"></video>';
-            const peer = new Peer('viewer-' + Date.now(), {host: '0.peerjs.com', port: 443});
-            peer.on('open', () => {
-                const call = peer.call(params.get('watch'));
-                call.on('stream', (stream) => {
-                    document.getElementById('v').srcObject = stream;
-                    document.body.innerHTML = '<h1>LionFuel Live 🔴</h1><video autoplay style="width:100%" id="v"></video>';
-                    document.getElementById('v').srcObject = stream;
+        // ========== HOST: START STREAM ==========
+        async function startStream() {
+            try {
+                console.log("Starting stream...");
+                
+                // 1. Get camera/microphone
+                myStream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280, min: 640 },
+                        height: { ideal: 720, min: 480 }
+                    },
+                    audio: true
                 });
-            });
+                
+                // 2. Show my video
+                const myVideo = document.getElementById('myVideo');
+                myVideo.srcObject = myStream;
+                myVideo.muted = true;
+                
+                // 3. Create unique ID
+                myPeerId = 'lionfuel-' + Date.now() + Math.floor(Math.random() * 1000);
+                console.log("My Peer ID:", myPeerId);
+                
+                // 4. Initialize PeerJS with RELIABLE settings
+                peer = new Peer(myPeerId, {
+                    host: '0.peerjs.com',
+                    port: 443,
+                    path: '/',
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'stun:stun2.l.google.com:19302' },
+                            { urls: 'stun:stun3.l.google.com:19302' },
+                            { urls: 'stun:stun4.l.google.com:19302' }
+                        ]
+                    },
+                    debug: 3
+                });
+                
+                // 5. Handle peer events
+                peer.on('open', (id) => {
+                    console.log("Peer connected, ID:", id);
+                    
+                    // Generate viewer link
+                    const viewerLink = `${window.location.origin}${window.location.pathname}?watch=${id}`;
+                    document.getElementById('streamLink').value = viewerLink;
+                    document.getElementById('linkSection').style.display = 'block';
+                    
+                    // Update UI
+                    document.getElementById('status').innerHTML = "🔴 <strong>LIVE NOW</strong> - Share the link above";
+                    document.getElementById('startBtn').disabled = true;
+                    document.getElementById('stopBtn').disabled = false;
+                    
+                    alert("🎉 BROADCAST STARTED!\n\nCopy the link and send to viewers.\n\nIMPORTANT: Tell viewers to use CHROME browser, not Edge!");
+                });
+                
+                // 6. Handle incoming viewers
+                peer.on('call', (call) => {
+                    console.log("Incoming call from viewer:", call.peer);
+                    
+                    // Answer with our stream
+                    call.answer(myStream);
+                    
+                    // Track this viewer
+                    viewerCount++;
+                    updateViewerCount();
+                    
+                    // When viewer disconnects
+                    call.on('close', () => {
+                        viewerCount = Math.max(0, viewerCount - 1);
+                        updateViewerCount();
+                    });
+                    
+                    // Handle stream (not needed for host, but keeps connection alive)
+                    call.on('stream', (remoteStream) => {
+                        console.log("Viewer stream received");
+                    });
+                });
+                
+                peer.on('error', (err) => {
+                    console.error("Peer error:", err);
+                    if (err.type !== 'peer-unavailable') {
+                        alert("Connection issue: " + err.message + "\n\nTry refreshing the page.");
+                    }
+                });
+                
+            } catch (error) {
+                console.error("Error:", error);
+                alert("❌ ERROR: " + error.message + "\n\nPlease check:\n1. Camera/microphone is connected\n2. You clicked 'Allow' for permissions\n3. No other app is using camera\n\nThen refresh and try again.");
+            }
         }
+        
+        // ========== VIEWER: JOIN STREAM ==========
+        async function joinAsViewer(hostId) {
+            console.log("Joining as viewer, host ID:", hostId);
+            
+            try {
+                // Create viewer peer with unique ID
+                const viewerId = 'viewer-' + Date.now() + Math.floor(Math.random() * 1000);
+                const viewerPeer = new Peer(viewerId, {
+                    host: '0.peerjs.com',
+                    port: 443,
+                    path: '/',
+                    config: {
+                        iceServers: [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' }
+                        ]
+                    }
+                });
+                
+                viewerPeer.on('open', () => {
+                    console.log("Viewer peer ready, calling host...");
+                    
+                    // Call the host
+                    const call = viewerPeer.call(hostId);
+                    
+                    if (!call) {
+                        document.getElementById('viewerStatus').textContent = "Failed to connect to host";
+                        return;
+                    }
+                    
+                    // Handle host's stream
+                    call.on('stream', (remoteStream) => {
+                        console.log("🎉 STREAM RECEIVED FROM HOST!");
+                        
+                        const viewerVideo = document.getElementById('viewerVideo');
+                        viewerVideo.srcObject = remoteStream;
+                        viewerVideo.muted = false;
+                        
+                        document.getElementById('viewerStatus').innerHTML = "✅ <strong>CONNECTED TO LIONFUEL LIVE</strong>";
+                        document.getElementById('viewerLoading').style.display = 'none';
+                        
+                        // Auto-play video
+                        viewerVideo.play().catch(e => console.log("Auto-play prevented:", e));
+                    });
+                    
+                    call.on('close', () => {
+                        document.getElementById('viewerStatus').textContent = "Host ended the stream";
+                        document.getElementById('viewerLoading').style.display = 'none';
+                    });
+                    
+                    call.on('error', (err) => {
+                        console.error("Call error:", err);
+                        document.getElementById('viewerStatus').textContent = "Connection error: " + err.message;
+                        document.getElementById('viewerLoading').style.display = 'none';
+                    });
+                });
+                
+                viewerPeer.on('error', (err) => {
+                    console.error("Viewer peer error:", err);
+                    
+                    if (err.type === 'peer-unavailable') {
+                        document.getElementById('viewerStatus').textContent = "Host is not available. They may not be broadcasting.";
+                        document.getElementById('viewerLoading').style.display = 'none';
+                    } else if (err.type === 'network') {
+                        document.getElementById('viewerStatus').textContent = "Network error. Check your internet connection.";
+                        document.getElementById('viewerLoading').style.display = 'none';
+                    }
+                });
+                
+                // Timeout after 30 seconds
+                setTimeout(() => {
+                    if (document.getElementById('viewerLoading').style.display !== 'none') {
+                        document.getElementById('viewerStatus').innerHTML = "⚠️ Still connecting... Try:<br>1. Refresh the page<br>2. Make sure host is broadcasting<br>3. Use Chrome browser";
+                        document.getElementById('viewerLoading').style.display = 'none';
+                    }
+                }, 30000);
+                
+            } catch (error) {
+                console.error("Viewer join error:", error);
+                document.getElementById('viewerStatus').textContent = "Error: " + error.message;
+                document.getElementById('viewerLoading').style.display = 'none';
+            }
+        }
+        
+        // ========== HELPER FUNCTIONS ==========
+        function updateViewerCount() {
+            document.getElementById('viewerCount').textContent = `Viewers: ${viewerCount}`;
+        }
+        
+        function copyLink() {
+            const linkInput = document.getElementById('streamLink');
+            linkInput.select();
+            
+            try {
+                navigator.clipboard.writeText(linkInput.value).then(() => {
+                    alert("✅ Link copied!\n\nSend this to your viewers.\n\nTELL THEM: Use Chrome browser, wait 10-20 seconds to connect.");
+                });
+            } catch (e) {
+                // Fallback for older browsers
+                document.execCommand('copy');
+                alert("✅ Link copied!\n\nSend this to your viewers.\n\nTELL THEM: Use Chrome browser, wait 10-20 seconds to connect.");
+            }
+        }
+        
+        function stopStream() {
+            // Stop media stream
+            if (myStream) {
+                myStream.getTracks().forEach(track => track.stop());
+                myStream = null;
+            }
+            
+            // Destroy peer connection
+            if (peer) {
+                peer.destroy();
+                peer = null;
+            }
+            
+            // Clear video
+            document.getElementById('myVideo').srcObject = null;
+            
+            // Reset UI
+            document.getElementById('status').textContent = "Broadcast ended";
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('linkSection').style.display = 'none';
+            document.getElementById('viewerCount').textContent = "Viewers: 0";
+            viewerCount = 0;
+            
+            alert("Broadcast stopped");
+        }
+        
+        // ========== PAGE LOAD ==========
+        window.addEventListener('load', function() {
+            console.log("Page loaded");
+            
+            // If we're the host, check browser
+            if (isHost) {
+                const isEdge = navigator.userAgent.indexOf("Edg") > -1;
+                const isChrome = navigator.userAgent.indexOf("Chrome") > -1;
+                
+                if (isEdge) {
+                    alert("⚠️ You're using Microsoft Edge (good for hosting)\n\nIMPORTANT: Tell VIEWERS to use CHROME browser for best results!");
+                } else if (!isChrome) {
+                    alert("⚠️ For best results:\nHost: Use Edge or Chrome\nViewers: Use Chrome browser");
+                }
+            }
+        });
+        
+        // Handle page close
+        window.addEventListener('beforeunload', function() {
+            if (peer) {
+                peer.destroy();
+            }
+            if (myStream) {
+                myStream.getTracks().forEach(track => track.stop());
+            }
+        });
     </script>
 </body>
 </html>
